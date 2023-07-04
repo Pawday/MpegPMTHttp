@@ -3,18 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "main.h"
 #include "mpegts/packet_inplace_parser.h"
-#include "mpegts/pmt_builder.h"
 #include "mpegts/pmt_dumper.h"
-#include "mpegts/psi_magics.h"
-
-#define TS_FILE_URL "http://home.imaqliq.tv/Katy8.ts"
-
-typedef struct
-{
-    MpegTsPMTBuilder_t pmt_builder;
-    MpegTsPacket_t packets[10];
-} ParseKit_t;
 
 void build_table__print_it_than_exit(MpegTsPMTBuilder_t *builder)
 {
@@ -34,7 +25,7 @@ void build_table__print_it_than_exit(MpegTsPMTBuilder_t *builder)
     exit(EXIT_SUCCESS);
 }
 
-size_t curl_data_chunk_recv_handler(void *data, size_t size, size_t nmemb, ParseKit_t *parse_kit)
+size_t curl_data_chunk_recv_handler(void *data, size_t size, size_t nmemb, PMTParseKit_t *parse_kit)
 {
     assert(size == 1);
 
@@ -69,12 +60,10 @@ int main()
 {
     int exit_code = EXIT_SUCCESS;
     CURL *curl = curl_easy_init();
-    ParseKit_t parse_kit;
+    PMTParseKit_t parse_kit;
 
     uint8_t pmt_build_buffer[MPEG_TS_PSI_PMT_SECTION_MAX_LENGTH];
-    mpeg_ts_pmt_builder_init(&parse_kit.pmt_builder,
-        pmt_build_buffer,
-        sizeof(pmt_build_buffer));
+    mpeg_ts_pmt_builder_init(&parse_kit.pmt_builder, pmt_build_buffer, sizeof(pmt_build_buffer));
 
     if (!curl) {
         printf("Error setup curl\n");
