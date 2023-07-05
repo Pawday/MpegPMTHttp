@@ -7,7 +7,7 @@
 #include "mpegts/packet_inplace_parser.h"
 #include "mpegts/pmt_dumper.h"
 
-void build_table__print_it_than_exit(MpegTsPMTBuilder_t *builder)
+void build_table_print_it_then_exit(MpegTsPMTBuilder_t *builder)
 {
 
     if (builder->state != PMT_BUILDER_STATE_TABLE_ASSEMBLED) {
@@ -39,7 +39,7 @@ size_t curl_data_chunk_recv_handler(void *data, size_t size, size_t nmemb, PMTPa
             parse_kit->packets + packet_index)) {
         case PMT_BUILDER_SEND_STATUS_TABLE_IS_ASSEMBLED:
         case PMT_BUILDER_SEND_STATUS_REDUNDANT_PACKET_REJECTED:
-            build_table__print_it_than_exit(&parse_kit->pmt_builder);
+            build_table_print_it_then_exit(&parse_kit->pmt_builder);
         case PMT_BUILDER_SEND_STATUS_NEED_MORE_PACKETS:
         case PMT_BUILDER_SEND_STATUS_INVALID_PACKET_REJECTED:
             continue;
