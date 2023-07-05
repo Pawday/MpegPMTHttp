@@ -38,7 +38,7 @@ size_t curl_data_chunk_recv_handler(void *data, size_t size, size_t nmemb, PMTPa
         switch (mpeg_ts_pmt_builder_try_send_packet(&parse_kit->pmt_builder,
             parse_kit->packets + packet_index)) {
         case PMT_BUILDER_SEND_STATUS_TABLE_IS_ASSEMBLED:
-        case PMT_BUILDER_SEND_STATUS_REDUDANT_PACKET_REJECTED:
+        case PMT_BUILDER_SEND_STATUS_REDUNDANT_PACKET_REJECTED:
             build_table__print_it_than_exit(&parse_kit->pmt_builder);
         case PMT_BUILDER_SEND_STATUS_NEED_MORE_PACKETS:
         case PMT_BUILDER_SEND_STATUS_INVALID_PACKET_REJECTED:
