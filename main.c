@@ -84,7 +84,7 @@ int main()
     }
 
     if (curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, MPEG_TS_PACKET_SIZE * 5) != CURLE_OK) {
-        printf("Error set parse kit as arg for curl's data handler\n");
+        printf("Error set curl buffer size\n");
         goto error_exit_clean_curl;
     }
 
