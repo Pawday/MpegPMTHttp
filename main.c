@@ -8,9 +8,8 @@
 #include "mpegts/pmt_builder.h"
 #include "mpegts/pmt_dumper.h"
 
-bool build_and_print_pmt(MpegTsPMTBuilder_t *builder)
+bool try_build_and_print_pmt(MpegTsPMTBuilder_t *builder)
 {
-
     if (builder->state != PMT_BUILDER_STATE_TABLE_ASSEMBLED) {
         return false;
     }
@@ -44,7 +43,7 @@ size_t curl_data_chunk_recv_handler(void *data, size_t size, size_t nmemb, PMTPa
             parse_kit->packets + packet_index)) {
         case PMT_BUILDER_SEND_STATUS_TABLE_IS_ASSEMBLED:
         case PMT_BUILDER_SEND_STATUS_REDUNDANT_PACKET_REJECTED:
-            if (build_and_print_pmt(&parse_kit->pmt_builder)) {
+            if (try_build_and_print_pmt(&parse_kit->pmt_builder)) {
                 pmt_was_found = true;
                 break;
             }
