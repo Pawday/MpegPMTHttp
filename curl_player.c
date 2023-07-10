@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <curl/curl.h>
+#include <curl/urlapi.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,6 +8,7 @@
 #include "mpegts/packet_inplace_parser.h"
 #include "mpegts/pmt_builder.h"
 #include "mpegts/pmt_dumper.h"
+#include "pmt_output.h"
 
 #include "curl_player.h"
 #include "player.h"
@@ -17,14 +19,14 @@ bool is_url_source(MediaSource_t *source)
         return false;
     }
 
-    if (source->impl_data_size != sizeof(UrlSource_t)) {
+    if (source->impl_data_size != sizeof(CURLSource_t)) {
         return false;
     }
 
     return true;
 }
 
-static inline bool url_source_impl(MediaSource_t *raw_source, UrlSource_t **output_source)
+static inline bool url_source_impl(MediaSource_t *raw_source, CURLSource_t **output_source)
 {
     if (!is_url_source(raw_source)) {
         return false;
@@ -35,64 +37,58 @@ static inline bool url_source_impl(MediaSource_t *raw_source, UrlSource_t **outp
     return true;
 }
 
-bool make_url_source(MediaSource_t *output_source)
+bool make_curl_source(MediaSource_t *output_source)
 {
-    output_source->impl_data_size = sizeof(UrlSource_t);
+    CURLU *url = curl_url();
+    if (url == NULL) {
+        return false;
+    }
+
+    output_source->impl_data_size = sizeof(CURLSource_t);
     output_source->impl_data = malloc(output_source->impl_data_size);
 
-    UrlSource_t *impl;
+    CURLSource_t *impl;
     bool get_impl_status = url_source_impl(output_source, &impl);
     assert(get_impl_status);
+    if (!get_impl_status) {
+        return false;
+    }
 
-    memset(impl->url, 0, URL_MAX_LEN);
+    impl->curl_url_handle = url;
 
     return true;
 }
 
 bool replace_url(MediaSource_t *raw_source, const char *new_url)
 {
-    UrlSource_t *source;
+    size_t url_len = strnlen(new_url, URL_MAX_LEN);
+    if (url_len >= URL_MAX_LEN) {
+        return false;
+    }
+
+    CURLSource_t *source;
     if (!url_source_impl(raw_source, &source)) {
         return false;
     }
 
-    size_t url_len = strnlen(new_url, URL_MAX_LEN);
-    if (url_len == URL_MAX_LEN) {
+    if (CURLUE_OK != curl_url_set(source->curl_url_handle, CURLUPART_URL, new_url, 0)) {
         return false;
     }
-
-    memcpy(source->url, new_url, url_len);
-    source->url[url_len] = 0; // zero term
 
     return true;
 }
 
-bool delete_url_source(MediaSource_t *media_source)
+bool cleanup_curl_source(MediaSource_t *media_source)
 {
-    UrlSource_t *impl;
+    CURLSource_t *impl;
     if (!url_source_impl(media_source, &impl)) {
         return false;
     }
 
+    curl_url_cleanup(impl->curl_url_handle);
+    free(media_source->impl_data);
     media_source->impl_data_size = 0;
-    free(impl);
 
-    return true;
-}
-
-bool try_build_and_print_pmt(MpegTsPMTBuilder_t *builder)
-{
-    if (builder->state != PMT_BUILDER_STATE_TABLE_ASSEMBLED) {
-        return false;
-    }
-
-    MpegTsPMT_t table = {0};
-    if (!mpeg_ts_pmt_builder_try_build_table(builder, &table)) {
-        return false;
-    }
-
-    mpeg_ts_dump_pmt_to_stream(&table, stdout);
-    printf("\n");
     return true;
 }
 
@@ -106,35 +102,7 @@ static size_t curl_data_chunk_recv_handler(void *data, size_t size, size_t nmemb
         player->packets,
         sizeof(player->packets) / sizeof(player->packets[0]));
 
-    bool pmt_was_found = false;
-    bool error_occurred = false;
-
-    for (size_t packet_index = 0;
-         !pmt_was_found && !error_occurred && packet_index < parsed_packets;
-         packet_index++) {
-        switch (mpeg_ts_pmt_builder_try_send_packet(&player->pmt_builder,
-            player->packets + packet_index)) {
-        case PMT_BUILDER_SEND_STATUS_TABLE_IS_ASSEMBLED:
-        case PMT_BUILDER_SEND_STATUS_REDUNDANT_PACKET_REJECTED:
-            if (try_build_and_print_pmt(&player->pmt_builder)) {
-                pmt_was_found = true;
-                break;
-            }
-            mpeg_ts_pmt_builder_reset(&player->pmt_builder);
-            continue;
-        case PMT_BUILDER_SEND_STATUS_NEED_MORE_PACKETS:
-        case PMT_BUILDER_SEND_STATUS_INVALID_PACKET_REJECTED:
-            continue;
-        case PMT_BUILDER_SEND_STATUS_UNORDERED_PACKET_REJECTED:
-            mpeg_ts_pmt_builder_reset(&player->pmt_builder);
-            continue;
-        case PMT_BUILDER_SEND_STATUS_NOT_ENOUGHT_MEMORY:
-            error_occurred = true;
-            break;
-        }
-    }
-
-    if (error_occurred || pmt_was_found) {
+    if (!process_packets(&player->pmt_builder, player->packets, parsed_packets)) {
         return 0;
     }
 
@@ -160,7 +128,7 @@ bool is_curl_player(Player_t *plyr)
 
 static inline bool curl_plyr_get_impl(Player_t *plyr, CurlPlayer_t **out)
 {
-    if (is_curl_player(plyr)) {
+    if (!is_curl_player(plyr)) {
         return false;
     }
 
@@ -181,9 +149,14 @@ bool player_curl_init(Player_t *plyr)
         return false;
     }
 
+    MediaSource_t url_source = {0};
+    if (!make_curl_source(&url_source)) {
+        goto error_free_impl_data;
+    }
+
     CURLM *multi_handle = curl_multi_init();
     if (!multi_handle) {
-        goto error_free_impl_data;
+        goto error_free_curl_source;
     }
 
     CURL *easy_handle = curl_easy_init();
@@ -199,33 +172,24 @@ bool player_curl_init(Player_t *plyr)
     CurlPlayer_t *plyr_impl = plyr->impl_data;
     plyr_impl->state = PLYR_IDLE;
     plyr_impl->last_curl_error_code = CURLE_OK;
+    plyr_impl->media_source.impl_data = url_source.impl_data;
+    plyr_impl->media_source.impl_data_size = sizeof(CURLSource_t);
     plyr_impl->multi_handle = multi_handle;
     plyr_impl->easy_handle = easy_handle;
     plyr_impl->pmt_build_buffer = pmt_build_buffer;
-    memset(plyr_impl->current_media_source.url, 0, URL_MAX_LEN);
+
     mpeg_ts_pmt_builder_init(&plyr_impl->pmt_builder,
         pmt_build_buffer,
         MPEG_TS_PSI_PMT_SECTION_MAX_LENGTH);
 
-    if (CURLE_OK !=
-        curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, curl_data_chunk_recv_handler)) {
-        goto error_free_build_buffer;
-    }
-
-    if (CURLE_OK != curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, plyr->impl_data)) {
-        goto error_free_build_buffer;
-    }
-
-    curl_multi_add_handle(multi_handle, easy_handle);
-
     return true;
 
-error_free_build_buffer:
-    free(plyr_impl->pmt_build_buffer);
 error_free_easy_handle:
     curl_easy_cleanup(easy_handle);
 error_free_multi_handle:
     curl_multi_cleanup(multi_handle);
+error_free_curl_source:
+    cleanup_curl_source(&url_source);
 error_free_impl_data:
     free(plyr->impl_data);
     plyr->impl_data = NULL;
@@ -240,17 +204,23 @@ bool player_curl_destroy(Player_t *plyr)
         return false;
     }
 
+    bool cleanup_status = cleanup_curl_source(&plyr_impl->media_source);
+    assert(cleanup_status);
+    if (!cleanup_status) {
+        return false;
+    }
+
     free(plyr_impl->pmt_build_buffer);
     curl_multi_cleanup(plyr_impl->multi_handle);
-    curl_multi_cleanup(plyr_impl->multi_handle);
+    curl_easy_cleanup(plyr_impl->easy_handle);
     free(plyr->impl_data);
-    plyr->impl_data_size = 0;
     plyr->impl_data = NULL;
+    plyr->impl_data_size = 0;
 
     return true;
 }
 
-bool player_set_source(Player_t *plyr, MediaSource_t *new_source_raw)
+bool player_get_media_source(Player_t *plyr, MediaSource_t **output_source)
 {
     CurlPlayer_t *plyr_impl;
     if (!curl_plyr_get_impl(plyr, &plyr_impl)) {
@@ -261,19 +231,7 @@ bool player_set_source(Player_t *plyr, MediaSource_t *new_source_raw)
         return false;
     }
 
-    UrlSource_t *new_source;
-    if (!url_source_impl(new_source_raw, &new_source)) {
-        return false;
-    }
-
-    plyr_impl->current_media_source = *new_source;
-
-    if (CURLE_OK != curl_easy_setopt(plyr_impl->easy_handle,
-                        CURLOPT_URL,
-                        plyr_impl->current_media_source.url)) {
-        return false;
-    }
-
+    *output_source = &plyr_impl->media_source;
     return true;
 }
 
@@ -288,7 +246,55 @@ bool player_start(Player_t *plyr)
         return false;
     }
 
-    return false;
+    CURLSource_t *source = NULL;
+    if (!url_source_impl(&plyr_impl->media_source, &source)) {
+        return false;
+    }
+
+    if (CURLE_OK != curl_easy_setopt(plyr_impl->easy_handle,
+                        CURLOPT_WRITEFUNCTION,
+                        curl_data_chunk_recv_handler)) {
+        return false;
+    }
+
+    if (CURLE_OK != curl_easy_setopt(plyr_impl->easy_handle, CURLOPT_WRITEDATA, plyr->impl_data)) {
+        return false;
+    }
+
+    if (CURLE_OK !=
+        curl_easy_setopt(plyr_impl->easy_handle, CURLOPT_CURLU, source->curl_url_handle)) {
+        return false;
+    }
+
+    if (CURLM_OK != curl_multi_add_handle(plyr_impl->multi_handle, plyr_impl->easy_handle)) {
+        return false;
+    }
+
+    plyr_impl->state = PLYR_PLAYING;
+
+    return true;
+}
+
+bool player_stop(Player_t *plyr)
+{
+    CurlPlayer_t *plyr_impl;
+    if (!curl_plyr_get_impl(plyr, &plyr_impl)) {
+        return false;
+    }
+
+    if (plyr_impl->state != PLYR_PLAYING) {
+        return false;
+    }
+
+    if (CURLM_OK != curl_multi_remove_handle(plyr_impl->multi_handle, plyr_impl->easy_handle)) {
+        return false;
+    }
+
+    curl_easy_reset(plyr_impl->easy_handle);
+
+    plyr_impl->state = PLYR_IDLE;
+
+    return true;
 }
 
 PlayerState player_get_state(Player_t *plyr)

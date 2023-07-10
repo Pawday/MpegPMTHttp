@@ -18,9 +18,21 @@ strictify_target_compilation(MpegTsHttp)
 target_compile_features(MpegTsHttp PRIVATE c_std_11)
 target_compile_definitions(MpegTsHttp PRIVATE CURL_STRICTER)
 
+
+target_compile_options(MpegTsHttp PRIVATE "-fsanitize=address")
+target_link_options(MpegTsHttp PRIVATE "-fsanitize=address")
+
+
+target_compile_options(MpegTsHttp PRIVATE "-fno-optimize-sibling-calls")
+target_link_options(MpegTsHttp PRIVATE "-fno-optimize-sibling-calls")
+
+target_compile_options(MpegTsHttp PRIVATE "-fno-omit-frame-pointer")
+target_link_options(MpegTsHttp PRIVATE "-fno-omit-frame-pointer")
+
 target_sources(MpegTsHttp PRIVATE
 	main.c
 	curl_player.c
+pmt_output.c
 	)
 
 target_link_libraries(MpegTsHttp PRIVATE MpegTS)
