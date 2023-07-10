@@ -1,7 +1,7 @@
 # CURL MpegTs PMT dumper
 
 
-## Install curl
+## Install libraries
 ```sh
 sudo apt install libcurl4-openssl-dev
 ```
