@@ -3,31 +3,36 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "mpegts/packet.h"
+#include "mpegts/pmt_builder.h"
+#include "media_source.h"
+
+#define PLAYER_PACKETS_AM 10
+
 typedef enum
 {
     PLYR_IDLE,
     PLYR_PLAYING,
     PLYR_PAUSED,
     PLYR_ERROR
-} PlayerState;
+} PlayerState_e;
 
 typedef struct
 {
-    void *impl_data;
-    size_t impl_data_size;
-} MediaSource_t;
-
-typedef struct
-{
-    void *impl_data;
-    size_t impl_data_size;
+    PlayerState_e state;
+    MediaSource_t *media_source;
+    MpegTsPMTBuilder_t pmt_builder;
+    MpegTsPacket_t packets[PLAYER_PACKETS_AM];
 } Player_t;
+
+bool player_init(Player_t *plyr);
+void player_destroy(Player_t *plyr);
 
 bool player_start(Player_t *plyr);
 bool player_stop(Player_t *plyr);
 bool player_process(Player_t *plyr);
-bool player_get_media_source(Player_t *plyr, MediaSource_t **output_source);
-bool player_replace_media_source(Player_t *plyr, MediaSource_t new_source);
 
-PlayerState player_get_state(Player_t *plyr);
+bool player_replace_media_source(Player_t *plyr, MediaSource_t *new_source);
+
+PlayerState_e player_get_state(Player_t *plyr);
 

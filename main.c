@@ -1,10 +1,6 @@
 #include <assert.h>
-#include <curl/curl.h>
-#include <curl/urlapi.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <json-c/json_object.h>
-#include <json-c/json_tokener.h>
 #include <memory.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,7 +10,7 @@
 
 #include <json-c/json.h>
 
-#include "curl_player.h"
+#include "curl_media_source.h"
 #include "main.h"
 #include "mpegts/packet_inplace_parser.h"
 #include "mpegts/pmt_builder.h"
@@ -46,7 +42,7 @@ void print_string_escaped(char *string, size_t len)
     }
 }
 
-bool replace_url_from_json_cmd(MediaSource_t *url_source, uint8_t *json_str, size_t len)
+bool parse_play_command(uint8_t *json_str, size_t len, PlayCommand *output)
 {
     if (len > INT32_MAX) {
         return false;
@@ -79,11 +75,13 @@ bool replace_url_from_json_cmd(MediaSource_t *url_source, uint8_t *json_str, siz
 
     json_object *url = NULL;
     if (!json_object_object_get_ex(obj, "url", &url)) {
+        printf("[WARNING]: field \"url\" not found:\n");
         goto exit_parse_error;
     }
 
     int url_string_len = json_object_get_string_len(url);
     if (url_string_len > URL_MAX_LEN) {
+        printf("[WARNING]: field \"url\" is too big\n");
         goto exit_parse_error;
     }
 
@@ -92,12 +90,8 @@ bool replace_url_from_json_cmd(MediaSource_t *url_source, uint8_t *json_str, siz
         goto exit_parse_error;
     }
 
-    if (!replace_url(url_source, url_string)) {
-        printf("[WARNING]: Failed to set new media source with: %s\n", url_string);
-        goto exit_parse_error;
-    }
-
-    printf("[INFO]: New source: %s\n", url_string);
+    memset(output->url, 0, sizeof(output->url));
+    memcpy(output->url, url_string, url_string_len);
 
     bool parse_status = true;
     goto exit_ok;
@@ -144,47 +138,29 @@ int main(void)
     main_json_tokener = toker;
 
     Player_t player = {0};
-    if (!player_curl_init(&player)) {
+    if (!player_init(&player)) {
         printf("[ERROR]: init player\n");
         goto exit_fail;
     }
 
-    MediaSource_t *player_media_source = NULL;
-    if (!player_get_media_source(&player, &player_media_source)) {
-        printf("[ERROR] get media source from player\n");
+    MediaSource_t curl_media_source = {0};
+    if (!media_source_curl_init(&curl_media_source)) {
+        printf("[ERROR] create curl media source\n");
         goto exit_fail;
     }
 
     uint8_t command_buffer[IPC_MAX_MESSAGE_LEN];
     memset(command_buffer, 0, IPC_MAX_MESSAGE_LEN);
 
-    printf("[INFO]: Waiting for first media source\n");
-    bool waiting_for_first_source = true;
-    while (waiting_for_first_source) {
-        int readen_or_err = read(pipe_fd, command_buffer, IPC_MAX_MESSAGE_LEN);
-        if (readen_or_err < 0 && errno != EAGAIN) {
-            perror("[ERROR]: Read from pipe\n");
-            goto exit_fail;
-        }
-        if (readen_or_err > 0) {
-            size_t pipe_input_len =
-                build_string_from(pipe_fd, command_buffer, sizeof(command_buffer), readen_or_err);
-            if (!replace_url_from_json_cmd(player_media_source, command_buffer, pipe_input_len)) {
-                memset(command_buffer, 0, IPC_MAX_MESSAGE_LEN);
-                continue;
-            }
-            break;
-        }
-        sleep(1);
-    }
+    PlayCommand play_cmd = {0};
 
-    if (!player_start(&player)) {
-        printf("[ERROR]: player start\n");
-        goto exit_fail;
-    }
+    printf("[INFO]: Waiting for commands\n");
+
+    bool player_recvd_first_source = false;
 
     while (true) {
-        if (!player_process(&player)) {
+
+        if (!player_process(&player) && player_recvd_first_source) {
             printf("[ERROR]: while playing\n");
             goto exit_fail;
         }
@@ -198,24 +174,41 @@ int main(void)
             size_t pipe_input_len =
                 build_string_from(pipe_fd, command_buffer, sizeof(command_buffer), readen_or_err);
 
-            if (!player_stop(&player)) {
+            if (!parse_play_command(command_buffer, pipe_input_len, &play_cmd)) {
+                continue;
+            }
+
+            CURLMediaSource_t *curl_source_ptr;
+            bool media_source_cast_status =
+                media_source_curl_from_raw(&curl_media_source, &curl_source_ptr);
+            assert(media_source_cast_status);
+            if (!media_source_cast_status) {
+                printf("[ERROR] cast raw source to curl source\n");
+                goto exit_fail;
+            }
+
+            if (!media_source_curl_try_set_url(curl_source_ptr, play_cmd.url)) {
+                printf("[WARNING]: Unsuported url: %s\n", play_cmd.url);
+                continue;
+            }
+
+            if (player_recvd_first_source && !player_stop(&player)) {
                 printf("[ERROR] stopping player\n");
                 goto exit_fail;
             }
 
-            player_media_source = NULL;
-            if (!player_get_media_source(&player, &player_media_source)) {
-                printf("[ERROR] get media source from player\n");
+            if (!player_replace_media_source(&player, &curl_media_source)) {
+                printf("[ERROR] replacing url\n");
                 goto exit_fail;
             }
+
+            player_recvd_first_source = true;
+
+            printf("[INFO]: New url: %s\n", play_cmd.url);
 
             if (!player_start(&player)) {
                 printf("[ERROR]: player start\n");
                 goto exit_fail;
-            }
-
-            if (!replace_url_from_json_cmd(player_media_source, command_buffer, pipe_input_len)) {
-                memset(command_buffer, 0, IPC_MAX_MESSAGE_LEN);
             }
         }
     }
@@ -226,8 +219,9 @@ int main(void)
 exit_fail:
     exit_status = EXIT_FAILURE;
 exit_success:
+    media_source_curl_destroy(&curl_media_source);
     json_tokener_free(main_json_tokener);
-    player_curl_destroy(&player);
+    player_destroy(&player);
     curl_global_cleanup();
     return exit_status;
 }
