@@ -27,6 +27,7 @@ bool player_start(Player_t *plyr);
 bool player_stop(Player_t *plyr);
 bool player_process(Player_t *plyr);
 bool player_get_media_source(Player_t *plyr, MediaSource_t **output_source);
+bool player_replace_media_source(Player_t *plyr, MediaSource_t new_source);
 
 PlayerState player_get_state(Player_t *plyr);
 

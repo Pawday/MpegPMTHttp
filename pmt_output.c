@@ -4,6 +4,11 @@
 
 static uint32_t last_table_crc = 0;
 
+void pmt_output_reset_crc(void)
+{
+    last_table_crc = 0;
+}
+
 static bool try_build_and_print_pmt(MpegTsPMTBuilder_t *builder)
 {
     if (builder->state != PMT_BUILDER_STATE_TABLE_ASSEMBLED) {
@@ -18,12 +23,15 @@ static bool try_build_and_print_pmt(MpegTsPMTBuilder_t *builder)
     if (table.CRC != last_table_crc) {
         mpeg_ts_dump_pmt_to_stream(&table, stdout);
         printf("\n");
+
+        last_table_crc = table.CRC;
     }
 
     return true;
 }
 
-bool process_packets(MpegTsPMTBuilder_t *builder, MpegTsPacket_t *packets, size_t packets_am)
+bool pmt_output_process_packets(MpegTsPMTBuilder_t *builder, MpegTsPacket_t *packets,
+    size_t packets_am)
 {
     bool pmt_was_found = false;
     bool error_occurred = false;

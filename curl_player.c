@@ -13,7 +13,7 @@
 #include "curl_player.h"
 #include "player.h"
 
-bool is_url_source(MediaSource_t *source)
+bool is_curl_source(MediaSource_t *source)
 {
     if (source == NULL) {
         return false;
@@ -28,7 +28,7 @@ bool is_url_source(MediaSource_t *source)
 
 static inline bool url_source_impl(MediaSource_t *raw_source, CURLSource_t **output_source)
 {
-    if (!is_url_source(raw_source)) {
+    if (!is_curl_source(raw_source)) {
         return false;
     }
 
@@ -102,7 +102,7 @@ static size_t curl_data_chunk_recv_handler(void *data, size_t size, size_t nmemb
         player->packets,
         sizeof(player->packets) / sizeof(player->packets[0]));
 
-    if (!process_packets(&player->pmt_builder, player->packets, parsed_packets)) {
+    if (!pmt_output_process_packets(&player->pmt_builder, player->packets, parsed_packets)) {
         return 0;
     }
 
@@ -281,6 +281,8 @@ bool player_stop(Player_t *plyr)
     if (!curl_plyr_get_impl(plyr, &plyr_impl)) {
         return false;
     }
+
+    pmt_output_reset_crc();
 
     if (plyr_impl->state != PLYR_PLAYING) {
         return false;

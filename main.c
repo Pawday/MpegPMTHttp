@@ -122,7 +122,6 @@ size_t build_string_from(int fd, uint8_t *buff, size_t buff_cap, const size_t in
 
 int main(void)
 {
-
     curl_global_init(0);
 
     if (mkfifo(PIPE_NAME, 0777) != 0 && errno != EEXIST) {

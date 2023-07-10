@@ -29,7 +29,7 @@ typedef struct
     MediaSource_t media_source;
 } CurlPlayer_t;
 
-bool is_url_source(MediaSource_t *url_source);
+bool is_curl_source(MediaSource_t *url_source);
 bool make_curl_source(MediaSource_t *output_source);
 bool replace_url(MediaSource_t *source, const char *new_url);
 bool cleanup_curl_source(MediaSource_t *media_source);
