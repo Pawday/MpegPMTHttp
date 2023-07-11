@@ -134,6 +134,28 @@ bool media_source_curl_destroy(MediaSource_t *source)
 
 bool media_source_curl_try_set_url(CURLMediaSource_t *source, char *new_url)
 {
+
+    char *current_url = NULL;
+    if (CURLE_OK != curl_easy_getinfo(source->easy_handle, CURLINFO_EFFECTIVE_URL, &current_url)) {
+        return false;
+    }
+
+    size_t current_url_len = strnlen(current_url, MEDIA_SOURCE_CURL_MAX_URL_LEN);
+    if (current_url_len == MEDIA_SOURCE_CURL_MAX_URL_LEN) {
+        return false;
+    }
+
+    size_t new_url_len = strnlen(new_url, MEDIA_SOURCE_CURL_MAX_URL_LEN);
+    if (new_url_len == MEDIA_SOURCE_CURL_MAX_URL_LEN) {
+        return false;
+    }
+
+    if (new_url_len == current_url_len) {
+        if (memcmp(new_url, current_url, new_url_len) == 0) {
+            return false;
+        }
+    }
+
     if (CURLE_OK != curl_multi_remove_handle(source->multi_handle, source->easy_handle)) {
         return false;
     }
@@ -143,11 +165,11 @@ bool media_source_curl_try_set_url(CURLMediaSource_t *source, char *new_url)
         return false;
     }
 
-    if (CURLE_OK != curl_multi_add_handle(source->multi_handle, source->easy_handle)) {
+    if (CURLE_OK != curl_easy_setopt(source->easy_handle, CURLOPT_URL, new_url)) {
         return false;
     }
 
-    if (CURLE_OK != curl_easy_setopt(source->easy_handle, CURLOPT_URL, new_url)) {
+    if (CURLE_OK != curl_multi_add_handle(source->multi_handle, source->easy_handle)) {
         return false;
     }
 

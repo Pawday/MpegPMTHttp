@@ -178,7 +178,11 @@ int main(void)
             }
 
             if (!player_replace_media_source_url(&player, play_cmd.url)) {
-                printf("[WARNING]: New url \"%s\" was not replaced\n", play_cmd.url);
+                printf("[WARNING]: Url \"%s\" was not set\n", play_cmd.url);
+                if (!player_start(&player)) {
+                    printf("[ERROR]: player start\n");
+                    goto exit_fail;
+                }
                 continue;
             }
 

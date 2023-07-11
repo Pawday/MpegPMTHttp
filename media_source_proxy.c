@@ -73,7 +73,6 @@ bool media_source_try_set_url(MediaSource_t *source, char *new_url)
         } else {
             source->type = MEDIA_SOURCE_HTTP;
         }
-
         CURLMediaSource_t *curl_source = NULL;
         if (!media_source_curl_from_raw(source, &curl_source)) {
             return false;

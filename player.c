@@ -67,8 +67,12 @@ bool player_replace_media_source_url(Player_t *plyr, char *new_url)
         return false;
     }
 
+    if (!media_source_try_set_url(&plyr->media_source, new_url)) {
+        return false;
+    }
+
     mpeg_ts_pmt_builder_reset(&plyr->pmt_builder);
     pmt_output_reset_crc();
 
-    return media_source_try_set_url(&plyr->media_source, new_url);
+    return true;
 }
