@@ -20,7 +20,7 @@ typedef enum
 typedef struct
 {
     PlayerState_e state;
-    MediaSource_t *media_source;
+    MediaSource_t media_source;
     MpegTsPMTBuilder_t pmt_builder;
     MpegTsPacket_t packets[PLAYER_PACKETS_AM];
 } Player_t;
@@ -32,7 +32,7 @@ bool player_start(Player_t *plyr);
 bool player_stop(Player_t *plyr);
 bool player_process(Player_t *plyr);
 
-bool player_replace_media_source(Player_t *plyr, MediaSource_t *new_source);
+bool player_replace_media_source_url(Player_t *plyr, char* new_url);
 
 PlayerState_e player_get_state(Player_t *plyr);
 

@@ -16,13 +16,13 @@ bool player_init(Player_t *plyr)
         MPEG_TS_PSI_PMT_SECTION_MAX_LENGTH);
 
     plyr->state = PLYR_IDLE;
-    plyr->media_source = NULL;
 
     return true;
 }
 
 void player_destroy(Player_t *plyr)
 {
+    media_source_destroy(&plyr->media_source);
     free(plyr->pmt_builder.table_data);
 }
 
@@ -51,7 +51,7 @@ bool player_process(Player_t *plyr)
     }
 
     size_t packets_revcd =
-        media_source_recv_packets(plyr->media_source, plyr->packets, PLAYER_PACKETS_AM);
+        media_source_recv_packets(&plyr->media_source, plyr->packets, PLAYER_PACKETS_AM);
 
     if (!pmt_output_process_packets(&plyr->pmt_builder, plyr->packets, packets_revcd)) {
         plyr->state = PLYR_ERROR;
@@ -61,14 +61,14 @@ bool player_process(Player_t *plyr)
     return true;
 }
 
-bool player_replace_media_source(Player_t *plyr, MediaSource_t *new_source)
+bool player_replace_media_source_url(Player_t *plyr, char *new_url)
 {
     if (plyr->state != PLYR_IDLE) {
         return false;
     }
 
+    mpeg_ts_pmt_builder_reset(&plyr->pmt_builder);
     pmt_output_reset_crc();
-    plyr->media_source = new_source;
 
-    return true;
+    return media_source_try_set_url(&plyr->media_source, new_url);
 }

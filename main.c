@@ -143,12 +143,6 @@ int main(void)
         goto exit_fail;
     }
 
-    MediaSource_t curl_media_source = {0};
-    if (!media_source_curl_init(&curl_media_source)) {
-        printf("[ERROR] create curl media source\n");
-        goto exit_fail;
-    }
-
     uint8_t command_buffer[IPC_MAX_MESSAGE_LEN];
     memset(command_buffer, 0, IPC_MAX_MESSAGE_LEN);
 
@@ -178,28 +172,14 @@ int main(void)
                 continue;
             }
 
-            CURLMediaSource_t *curl_source_ptr;
-            bool media_source_cast_status =
-                media_source_curl_from_raw(&curl_media_source, &curl_source_ptr);
-            assert(media_source_cast_status);
-            if (!media_source_cast_status) {
-                printf("[ERROR] cast raw source to curl source\n");
-                goto exit_fail;
-            }
-
-            if (!media_source_curl_try_set_url(curl_source_ptr, play_cmd.url)) {
-                printf("[WARNING]: Unsuported url: %s\n", play_cmd.url);
-                continue;
-            }
-
             if (player_recvd_first_source && !player_stop(&player)) {
                 printf("[ERROR] stopping player\n");
                 goto exit_fail;
             }
 
-            if (!player_replace_media_source(&player, &curl_media_source)) {
-                printf("[ERROR] replacing url\n");
-                goto exit_fail;
+            if (!player_replace_media_source_url(&player, play_cmd.url)) {
+                printf("[WARNING]: New url \"%s\" was not replaced\n", play_cmd.url);
+                continue;
             }
 
             player_recvd_first_source = true;
@@ -219,7 +199,6 @@ int main(void)
 exit_fail:
     exit_status = EXIT_FAILURE;
 exit_success:
-    media_source_curl_destroy(&curl_media_source);
     json_tokener_free(main_json_tokener);
     player_destroy(&player);
     curl_global_cleanup();

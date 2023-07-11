@@ -5,6 +5,7 @@
 #include <curl/curl.h>
 
 #include "curl_media_source.h"
+#include "media_source.h"
 #include "mpegts/packet_inplace_parser.h"
 
 static bool is_curl_source(MediaSource_t *raw_source)
@@ -65,6 +66,17 @@ bool media_source_curl_init(MediaSource_t *raw_source)
         return false;
     }
 
+    bool raw_source_is_empty = true;
+    raw_source_is_empty &= raw_source->type == MEDIA_SOURCE_NOTSET;
+    raw_source_is_empty &= raw_source->impl_data == NULL;
+    raw_source_is_empty &= raw_source->impl_data_size == 0;
+
+    // Probably memleak
+    assert(raw_source_is_empty);
+    if (!raw_source_is_empty) {
+        return false;
+    }
+
     CURL *easy_handle = curl_easy_init();
     if (!easy_handle) {
         return false;
@@ -113,18 +125,25 @@ bool media_source_curl_destroy(MediaSource_t *source)
 
     free(impl);
 
+    source->type = MEDIA_SOURCE_NOTSET;
+    source->impl_data_size = 0;
+    source->impl_data = NULL;
+
     return true;
 }
 
 bool media_source_curl_try_set_url(CURLMediaSource_t *source, char *new_url)
 {
-    size_t url_len = strnlen(new_url, MEDIA_SOURCE_CURL_MAX_URL_LEN);
-    if (url_len == MEDIA_SOURCE_CURL_MAX_URL_LEN) {
+    if (CURLE_OK != curl_multi_remove_handle(source->multi_handle, source->easy_handle)) {
         return false;
     }
 
     curl_easy_reset(source->easy_handle);
     if (!setup_easy_handle(source)) {
+        return false;
+    }
+
+    if (CURLE_OK != curl_multi_add_handle(source->multi_handle, source->easy_handle)) {
         return false;
     }
 

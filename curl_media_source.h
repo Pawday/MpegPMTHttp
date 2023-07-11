@@ -5,6 +5,7 @@
 #include "media_source.h"
 
 #define MEDIA_SOURCE_CURL_MAX_URL_LEN          128
+#define MEDIA_SOURCE_SCHEME_MAX_LEN            10
 #define MEDIA_SOURCE_CURL_TRANSFER_BUFFER_SIZE (1024 * 4)
 
 typedef struct
