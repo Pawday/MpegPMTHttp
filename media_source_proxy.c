@@ -6,15 +6,33 @@
 
 #include "curl_media_source.h"
 #include "media_source.h"
+#include "udp_media_source.h"
 
 size_t media_source_recv_packets(MediaSource_t *source, MpegTsPacket_t *output_packets,
     size_t n_packets)
 {
-    CURLMediaSource_t *curl_source = NULL;
-    if (media_source_curl_from_raw(source, &curl_source)) {
-        return media_source_curl_recv_packets(curl_source, output_packets, n_packets);
+    switch (source->type) {
+
+    case MEDIA_SOURCE_HTTP: {
+        CURLMediaSource_t *curl_source = NULL;
+        if (media_source_curl_from_raw(source, &curl_source)) {
+            return media_source_curl_recv_packets(curl_source, output_packets, n_packets);
+        }
+        return 0;
+    }
+    case MEDIA_SOURCE_UDP: {
+        UDPMediaSource_t *udp_source = NULL;
+        if (media_source_udp_from_raw(source, &udp_source)) {
+            return media_source_udp_recv_packets(udp_source, output_packets, n_packets);
+        }
+        return 0;
+    }
+    case MEDIA_SOURCE_NOTSET:
+    case MEDIA_SOURCE_UNKNOWN:
+        return 0;
     }
 
+    assert(false && "Should be unreachable");
     return 0;
 }
 
@@ -61,6 +79,19 @@ return_and_clean:
     return ret;
 }
 
+static bool is_source_empty(MediaSource_t *source)
+{
+    assert(source != NULL);
+
+    bool is_empty = true;
+
+    is_empty &= source->type == MEDIA_SOURCE_NOTSET;
+    is_empty &= source->impl_data == NULL;
+    is_empty &= source->impl_data_size == 0;
+
+    return is_empty;
+}
+
 bool media_source_try_set_url(MediaSource_t *source, char *new_url)
 {
     MediaSourceType_e detected_media_source = detect_media_source_type_from_url(new_url);
@@ -70,7 +101,18 @@ bool media_source_try_set_url(MediaSource_t *source, char *new_url)
     case MEDIA_SOURCE_HTTP: {
         if (source->type == MEDIA_SOURCE_NOTSET && !media_source_curl_init(source)) {
             return false;
-        } else {
+        } else if (source->type == MEDIA_SOURCE_NOTSET) {
+            source->type = MEDIA_SOURCE_HTTP;
+        }
+
+        if (source->type != MEDIA_SOURCE_HTTP) {
+            if (source->type != MEDIA_SOURCE_NOTSET) {
+                media_source_destroy(source);
+            }
+
+            if (!media_source_curl_init(source)) {
+                return false;
+            }
             source->type = MEDIA_SOURCE_HTTP;
         }
         CURLMediaSource_t *curl_source = NULL;
@@ -79,9 +121,29 @@ bool media_source_try_set_url(MediaSource_t *source, char *new_url)
         }
         return media_source_curl_try_set_url(curl_source, new_url);
     }
-    case MEDIA_SOURCE_UDP:
-        assert(false && "Not implemented");
-        return false;
+    case MEDIA_SOURCE_UDP: {
+        if (source->type == MEDIA_SOURCE_NOTSET && !media_source_udp_init(source)) {
+            return false;
+        }
+
+        if (source->type != MEDIA_SOURCE_UDP) {
+            if (source->type != MEDIA_SOURCE_NOTSET) {
+                media_source_destroy(source);
+            }
+
+            if (!media_source_udp_init(source)) {
+                return false;
+            }
+        }
+
+        UDPMediaSource_t *udp_source = NULL;
+        if (!media_source_udp_from_raw(source, &udp_source)) {
+            return false;
+        }
+
+        return media_source_udp_try_set_url(udp_source, new_url);
+    }
+
     case MEDIA_SOURCE_NOTSET:
         break;
     }
@@ -101,9 +163,15 @@ void media_source_destroy(MediaSource_t *source)
     case MEDIA_SOURCE_HTTP: {
         bool curl_source_destroy_status = media_source_curl_destroy(source);
         assert(curl_source_destroy_status);
+        assert(is_source_empty(source)); // No side effects
         return;
     }
-    case MEDIA_SOURCE_UDP:
+    case MEDIA_SOURCE_UDP: {
+        bool udp_source_destroy_status = media_source_udp_destroy(source);
+        assert(udp_source_destroy_status);
+        assert(is_source_empty(source)); // No side effects
+        return;
+    }
         assert(false && "Not implemented");
         return;
     case MEDIA_SOURCE_UNKNOWN:

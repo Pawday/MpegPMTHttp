@@ -19,7 +19,7 @@
 
 static json_tokener *main_json_tokener;
 
-void print_string_escaped(char *string, size_t len)
+void print_string_escaped(const char *string, size_t len)
 {
     for (size_t char_index = 0; char_index < len; char_index++) {
         bool replace_char = false;
@@ -108,7 +108,6 @@ size_t build_string_from(int fd, uint8_t *buff, size_t buff_cap, const size_t in
     int read_status;
     do {
         read_status = read(fd + bytes_readen_so_far, buff, buff_cap - bytes_readen_so_far);
-        return bytes_readen_so_far;
     } while (read_status > 0);
 
     return bytes_readen_so_far;

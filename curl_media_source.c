@@ -10,6 +10,10 @@
 
 static bool is_curl_source(MediaSource_t *raw_source)
 {
+    if (raw_source == NULL) {
+        return false;
+    }
+
     if (raw_source->impl_data_size != sizeof(CURLMediaSource_t)) {
         return false;
     }
@@ -114,10 +118,10 @@ exit_error_cleanup_handles:
     return false;
 }
 
-bool media_source_curl_destroy(MediaSource_t *source)
+bool media_source_curl_destroy(MediaSource_t *raw_source)
 {
     CURLMediaSource_t *impl = NULL;
-    if (!media_source_curl_from_raw(source, &impl)) {
+    if (!media_source_curl_from_raw(raw_source, &impl)) {
         return false;
     }
     curl_easy_cleanup(impl->easy_handle);
@@ -125,16 +129,15 @@ bool media_source_curl_destroy(MediaSource_t *source)
 
     free(impl);
 
-    source->type = MEDIA_SOURCE_NOTSET;
-    source->impl_data_size = 0;
-    source->impl_data = NULL;
+    raw_source->type = MEDIA_SOURCE_NOTSET;
+    raw_source->impl_data_size = 0;
+    raw_source->impl_data = NULL;
 
     return true;
 }
 
 bool media_source_curl_try_set_url(CURLMediaSource_t *source, char *new_url)
 {
-
     char *current_url = NULL;
     if (CURLE_OK != curl_easy_getinfo(source->easy_handle, CURLINFO_EFFECTIVE_URL, &current_url)) {
         return false;

@@ -32,10 +32,10 @@ target_link_options(MpegTsHttp PRIVATE "-fno-omit-frame-pointer")
 target_sources(MpegTsHttp PRIVATE
 	main.c
 	media_source_proxy.c
+        curl_media_source.c
         player.c
-        curl_media_source.c
-        curl_media_source.c
         pmt_output.c
+        udp_media_source.c
 	)
 
 target_link_libraries(MpegTsHttp PRIVATE MpegTS)
