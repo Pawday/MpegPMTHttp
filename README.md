@@ -25,7 +25,7 @@ cmake --build ./BUILD/RELEASE/HOSTCC/
 ```sh
 ./BUILD/RELEASE/HOSTCC/PMTPlayer
 
-# in separated terminal
+# in separate terminal...
 
 # udp multicas
 
