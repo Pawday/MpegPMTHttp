@@ -54,7 +54,7 @@ size_t curl_revc_handler(char *data, size_t size, size_t nmemb, CURLMediaSource_
 static bool setup_easy_handle(CURLMediaSource_t *source)
 {
     if (CURLE_OK !=
-        curl_easy_setopt(source->easy_handle, CURLOPT_WRITEFUNCTION, curl_revc_handler)) {
+        curl_easy_setopt(source->easy_handle, CURLOPT_WRITEFUNCTION, (curl_write_callback) curl_revc_handler)) {
         return false;
     }
     if (CURLE_OK != curl_easy_setopt(source->easy_handle, CURLOPT_WRITEDATA, source)) {
