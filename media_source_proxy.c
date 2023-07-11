@@ -44,37 +44,39 @@ static MediaSourceType_e detect_media_source_type_from_url(char *url)
     CURLU *url_parser = curl_url();
     if (url_parser == NULL) {
         ret = MEDIA_SOURCE_UNKNOWN;
-        goto return_and_clean;
+        goto cleanup_parser;
     }
 
     if (CURLE_OK != curl_url_set(url_parser, CURLUPART_URL, url, CURLU_NON_SUPPORT_SCHEME)) {
         ret = MEDIA_SOURCE_UNKNOWN;
-        goto return_and_clean;
+        goto cleanup_parser;
     }
 
     char *scheme = NULL;
     if (CURLE_OK != curl_url_get(url_parser, CURLUPART_SCHEME, &scheme, CURLU_NON_SUPPORT_SCHEME)) {
         ret = MEDIA_SOURCE_UNKNOWN;
-        goto return_and_clean;
+        goto cleanup_scheme;
     }
 
     size_t scheme_len = strnlen(scheme, MEDIA_SOURCE_SCHEME_MAX_LEN);
     if (scheme_len == MEDIA_SOURCE_SCHEME_MAX_LEN) {
         ret = MEDIA_SOURCE_UNKNOWN;
-        goto return_and_clean;
+        goto cleanup_scheme;
     }
 
     if (strcmp(scheme, "http") == 0) {
         ret = MEDIA_SOURCE_HTTP;
-        goto return_and_clean;
+        goto cleanup_scheme;
     }
 
     if (strcmp(scheme, "udp") == 0) {
         ret = MEDIA_SOURCE_UDP;
-        goto return_and_clean;
+        goto cleanup_scheme;
     }
 
-return_and_clean:
+cleanup_scheme:
+    curl_free(scheme);
+cleanup_parser:
     curl_url_cleanup(url_parser);
     return ret;
 }
@@ -172,8 +174,6 @@ void media_source_destroy(MediaSource_t *source)
         assert(is_source_empty(source)); // No side effects
         return;
     }
-        assert(false && "Not implemented");
-        return;
     case MEDIA_SOURCE_UNKNOWN:
         assert(false && "Looks like double free");
         return;

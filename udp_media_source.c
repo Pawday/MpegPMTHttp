@@ -105,8 +105,10 @@ bool parse_udp_addr_from_url(struct sockaddr_in *output_addr, char *url)
         goto exit_fail;
     }
     if (strcmp(scheme, "udp") != 0) {
+        curl_free(scheme);
         goto exit_fail;
     }
+    curl_free(scheme);
 
     char *addr_str = NULL;
     if (CURLE_OK != curl_url_get(url_parser, CURLUPART_HOST, &addr_str, 0)) {
@@ -115,8 +117,10 @@ bool parse_udp_addr_from_url(struct sockaddr_in *output_addr, char *url)
 
     struct in_addr addr;
     if (inet_aton(addr_str, &addr) == 0) {
+        curl_free(addr_str);
         goto exit_fail;
     }
+    curl_free(addr_str);
 
     in_port_t port;
     char *port_str = NULL;
@@ -124,6 +128,7 @@ bool parse_udp_addr_from_url(struct sockaddr_in *output_addr, char *url)
         goto exit_fail;
     }
     port = htons(atoi(port_str));
+    curl_free(port_str);
 
     memset(output_addr, 0, sizeof(struct sockaddr_in));
     output_addr->sin_family = AF_INET;
