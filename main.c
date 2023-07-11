@@ -1,14 +1,14 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <json-c/json.h>
 #include <memory.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#include <json-c/json.h>
 
 #include "curl_media_source.h"
 #include "main.h"
@@ -18,6 +18,7 @@
 #include "player.h"
 
 static json_tokener *main_json_tokener;
+static bool listen_loop_enabled = true;
 
 void print_string_escaped(const char *string, size_t len)
 {
@@ -113,9 +114,19 @@ size_t build_string_from(int fd, uint8_t *buff, size_t buff_cap, const size_t in
     return bytes_readen_so_far;
 }
 
+void handle_signal(int signo)
+{
+    (void)signo;
+    listen_loop_enabled = false;
+    printf("[INFO]: Terminating the process\n");
+}
+
 int main(void)
 {
     curl_global_init(0);
+
+    signal(SIGTERM, handle_signal);
+    signal(SIGINT, handle_signal);
 
     if (mkfifo(PIPE_NAME, 0777) != 0 && errno != EEXIST) {
         perror("[ERROR]: making pipe");
@@ -151,7 +162,7 @@ int main(void)
 
     bool player_recvd_first_source = false;
 
-    while (true) {
+    while (listen_loop_enabled) {
 
         if (!player_process(&player) && player_recvd_first_source) {
             printf("[ERROR]: while playing\n");
