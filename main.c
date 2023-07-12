@@ -140,12 +140,11 @@ int main(void)
     }
     fcntl(pipe_fd, F_SETFL, O_NONBLOCK);
 
-    json_tokener *toker = json_tokener_new();
-    if (!toker) {
+    main_json_tokener = json_tokener_new();
+    if (!main_json_tokener) {
         printf("[ERROR]: allocate json parser\n");
         goto exit_fail;
     }
-    main_json_tokener = toker;
 
     Player_t player = {0};
     if (!player_init(&player)) {
@@ -155,12 +154,12 @@ int main(void)
 
     uint8_t command_buffer[IPC_MAX_MESSAGE_LEN];
     memset(command_buffer, 0, IPC_MAX_MESSAGE_LEN);
-
     PlayCommand play_cmd = {0};
 
     printf("[INFO]: Waiting for commands\n");
 
     bool player_recvd_first_source = false;
+    int exit_status = EXIT_SUCCESS;
 
     while (listen_loop_enabled) {
 
@@ -174,45 +173,45 @@ int main(void)
             perror("[ERROR]: Read from pipe\n");
             goto exit_fail;
         }
-        if (readen_or_err > 0) {
-            size_t pipe_input_len =
-                build_string_from(pipe_fd, command_buffer, sizeof(command_buffer), readen_or_err);
+        if (readen_or_err <= 0) {
+            continue;
+        }
 
-            if (!parse_play_command(command_buffer, pipe_input_len, &play_cmd)) {
-                continue;
-            }
+        size_t pipe_input_len =
+            build_string_from(pipe_fd, command_buffer, sizeof(command_buffer), readen_or_err);
+        if (!parse_play_command(command_buffer, pipe_input_len, &play_cmd)) {
+            continue;
+        }
 
-            if (player_recvd_first_source && !player_stop(&player)) {
-                printf("[ERROR] stopping player\n");
-                goto exit_fail;
-            }
+        if (player_recvd_first_source && !player_stop(&player)) {
+            printf("[ERROR] stopping player\n");
+            goto exit_fail;
+        }
 
-            if (!player_replace_media_source_url(&player, play_cmd.url)) {
-                printf("[WARNING]: Url \"%s\" was not set\n", play_cmd.url);
-                if (!player_start(&player)) {
-                    printf("[ERROR]: player start\n");
-                    goto exit_fail;
-                }
-                continue;
-            }
-
-            player_recvd_first_source = true;
-
-            printf("[INFO]: New url: %s\n", play_cmd.url);
-
+        if (!player_replace_media_source_url(&player, play_cmd.url)) {
+            printf("[WARNING]: Url \"%s\" was not set\n", play_cmd.url);
             if (!player_start(&player)) {
                 printf("[ERROR]: player start\n");
                 goto exit_fail;
             }
+            continue;
+        }
+
+        player_recvd_first_source = true;
+
+        printf("[INFO]: New url: %s\n", play_cmd.url);
+
+        if (!player_start(&player)) {
+            printf("[ERROR]: player start\n");
+            goto exit_fail;
         }
     }
 
-    int exit_status = EXIT_SUCCESS;
-    goto exit_success;
+    goto cleanup_and_exit;
 
 exit_fail:
     exit_status = EXIT_FAILURE;
-exit_success:
+cleanup_and_exit:
     json_tokener_free(main_json_tokener);
     player_destroy(&player);
     curl_global_cleanup();
