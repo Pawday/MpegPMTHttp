@@ -3,9 +3,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "media_source.h"
 #include "mpegts/packet.h"
 #include "mpegts/pmt_builder.h"
-#include "media_source.h"
 
 #define PLAYER_PACKETS_AM 10
 

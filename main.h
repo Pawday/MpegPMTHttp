@@ -12,5 +12,5 @@
 
 typedef struct
 {
-    char url[URL_MAX_LEN + 1];
+    char url[URL_MAX_LEN];
 } PlayCommand_t;

@@ -1,4 +1,3 @@
-#include <arpa/inet.h>
 #include <assert.h>
 #include <curl/urlapi.h>
 #include <netinet/in.h>

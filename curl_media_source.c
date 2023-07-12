@@ -36,13 +36,13 @@ size_t curl_revc_handler(char *data, size_t size, size_t nmemb, CURLMediaSource_
     assert(size == 1);
 
     if (source->transfer_buffer_write_offset > MEDIA_SOURCE_CURL_TRANSFER_BUFFER_SIZE) {
-        return CURL_WRITEFUNC_ERROR;
+        return 0;
     }
 
     size_t bytes_avail =
         MEDIA_SOURCE_CURL_TRANSFER_BUFFER_SIZE - source->transfer_buffer_write_offset;
     if (nmemb > bytes_avail) {
-        return CURL_WRITEFUNC_PAUSE;
+        return 0;
     }
 
     memcpy(source->curl_transfer_buffer + source->transfer_buffer_write_offset, data, nmemb);
@@ -53,8 +53,9 @@ size_t curl_revc_handler(char *data, size_t size, size_t nmemb, CURLMediaSource_
 
 static bool setup_easy_handle(CURLMediaSource_t *source)
 {
-    if (CURLE_OK !=
-        curl_easy_setopt(source->easy_handle, CURLOPT_WRITEFUNCTION, (curl_write_callback) curl_revc_handler)) {
+    if (CURLE_OK != curl_easy_setopt(source->easy_handle,
+                        CURLOPT_WRITEFUNCTION,
+                        (curl_write_callback)curl_revc_handler)) {
         return false;
     }
     if (CURLE_OK != curl_easy_setopt(source->easy_handle, CURLOPT_WRITEDATA, source)) {
