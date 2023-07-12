@@ -107,6 +107,7 @@ bool media_source_curl_init(MediaSource_t *raw_source)
     impl->multi_handle = multi_handle;
     impl->easy_handle = easy_handle;
     impl->transfer_buffer_write_offset = 0;
+    memset(impl->curl_transfer_buffer, 0, MEDIA_SOURCE_CURL_TRANSFER_BUFFER_SIZE);
 
     raw_source->impl_data = impl;
     raw_source->impl_data_size = sizeof(CURLMediaSource_t);

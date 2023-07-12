@@ -10,7 +10,7 @@ function (target_set_strict_compilation TARGET)
 
 endfunction()
 
-function (target_add_llvm_sanitizer TARGET)
+function (target_try_add_llvm_sanitizer TARGET)
     if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
 	message(STATUS "Target ${TARGET} will be compiled with LLVM Asan")
         target_compile_options(${TARGET} PRIVATE "-fsanitize=address")
@@ -19,7 +19,7 @@ function (target_add_llvm_sanitizer TARGET)
     endif()
 endfunction()
 
-function (target_link_llvm_sanitizer TARGET)
+function (target_try_link_llvm_sanitizer TARGET)
     if (${CMAKE_C_COMPILER_ID} STREQUAL "Clang")
 	message(STATUS "Target ${TARGET} will be linked with LLVM Asan")
         target_link_options(${TARGET} PRIVATE "-fsanitize=address")

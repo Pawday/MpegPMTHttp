@@ -19,8 +19,8 @@ target_compile_features(PMTPlayer PRIVATE c_std_11)
 target_compile_definitions(PMTPlayer PRIVATE CURL_STRICTER)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_add_llvm_sanitizer(PMTPlayer)
-    target_link_llvm_sanitizer(PMTPlayer)
+    target_try_add_llvm_sanitizer(PMTPlayer)
+    target_try_link_llvm_sanitizer(PMTPlayer)
 endif()
 
 

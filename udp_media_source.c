@@ -59,6 +59,10 @@ bool media_source_udp_init(MediaSource_t *raw_source)
         return false;
     }
 
+    impl->socket_fd = 0;
+    memset(impl->udp_recv_buffer, 0, MEDIA_SOURCE_UDP_BUFF_SIZE);
+    memset(&impl->udp_addres, 0, sizeof(impl->udp_addres));
+
     raw_source->impl_data = impl;
     raw_source->impl_data_size = sizeof(UDPMediaSource_t);
     raw_source->type = MEDIA_SOURCE_UDP;
