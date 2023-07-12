@@ -1,4 +1,4 @@
-# CURL MpegTs PMT dumper
+# Multisource PMT Player
 
 
 ## Install libraries

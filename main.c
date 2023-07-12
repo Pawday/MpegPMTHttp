@@ -43,7 +43,7 @@ void print_string_escaped(const char *string, size_t len)
     }
 }
 
-bool parse_play_command(uint8_t *json_str, size_t len, PlayCommand *output)
+bool parse_play_command(uint8_t *json_str, size_t len, PlayCommand_t *output)
 {
     if (len > INT32_MAX) {
         return false;
@@ -76,12 +76,12 @@ bool parse_play_command(uint8_t *json_str, size_t len, PlayCommand *output)
 
     json_object *url = NULL;
     if (!json_object_object_get_ex(obj, "url", &url)) {
-        printf("[WARNING]: field \"url\" not found:\n");
+        printf("[WARNING]: field \"url\" was not not found:\n");
         goto exit_parse_error;
     }
 
     int url_string_len = json_object_get_string_len(url);
-    if (url_string_len > URL_MAX_LEN) {
+    if (url_string_len >= URL_MAX_LEN) {
         printf("[WARNING]: field \"url\" is too big\n");
         goto exit_parse_error;
     }
@@ -154,7 +154,7 @@ int main(void)
 
     uint8_t command_buffer[IPC_MAX_MESSAGE_LEN];
     memset(command_buffer, 0, IPC_MAX_MESSAGE_LEN);
-    PlayCommand play_cmd = {0};
+    PlayCommand_t play_cmd = {0};
 
     printf("[INFO]: Waiting for commands\n");
 
