@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(PMTPlayer)
+project(PMTPlayer C)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -37,3 +37,5 @@ target_sources(PMTPlayer PRIVATE
 target_link_libraries(PMTPlayer PRIVATE MpegTS)
 target_link_libraries(PMTPlayer PRIVATE CURL::libcurl)
 target_link_libraries(PMTPlayer PRIVATE ${JSONC_LIB})
+
+install(TARGETS PMTPlayer DESTINATION bin)
